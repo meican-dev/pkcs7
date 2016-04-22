@@ -15,6 +15,7 @@ import (
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"sort"
 	"time"
@@ -154,6 +155,8 @@ func parseSignedData(data []byte) (*PKCS7, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("signedData:%#v", sd)
+	fmt.Printf("signedData:%#v", sd)
 	// fmt.Printf("--> Signed Data Version %d\n", sd.Version)
 
 	var compound asn1.RawValue
@@ -228,10 +231,17 @@ func verifySignature(p7 *PKCS7, signer signerInfo) error {
 		if err != nil {
 			return err
 		}
+		log.Printf("the signer's DigestAlgorithm is %#v", signer.DigestAlgorithm.Algorithm)
 		hash, err := getHashForOID(signer.DigestAlgorithm.Algorithm)
 		if err != nil {
+			log.Println("wrong hash")
 			return err
 		}
+		log.Println("finish hash")
+		if hash == crypto.SHA256 {
+			log.Printf("and the hash is sha256")
+		}
+		log.Println("p7.content:%#v", p7.Content)
 		h := hash.New()
 		h.Write(p7.Content)
 		computed := h.Sum(nil)
@@ -252,7 +262,10 @@ func verifySignature(p7 *PKCS7, signer signerInfo) error {
 	if err != nil {
 		return err
 	}
-	algo := x509.SHA1WithRSA
+	algo, err := getSignatureAlgorithmForOID(signer.DigestEncryptionAlgorithm.Algorithm, signer.DigestAlgorithm.Algorithm)
+	if err != nil {
+		return err
+	}
 	return cert.CheckSignature(algo, encodedAttributes, signer.EncryptedDigest)
 }
 
@@ -272,6 +285,7 @@ func marshalAttributes(attrs []attribute) ([]byte, error) {
 
 var (
 	oidDigestAlgorithmSHA1    = asn1.ObjectIdentifier{1, 3, 14, 3, 2, 26}
+	oidDigestAlgorithmSHA256  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
 	oidEncryptionAlgorithmRSA = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
 )
 
@@ -288,8 +302,22 @@ func getHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
 	switch {
 	case oid.Equal(oidDigestAlgorithmSHA1):
 		return crypto.SHA1, nil
+	case oid.Equal(oidDigestAlgorithmSHA256):
+		return crypto.SHA256, nil
 	}
 	return crypto.Hash(0), ErrUnsupportedAlgorithm
+}
+
+func getSignatureAlgorithmForOID(encryptionOid asn1.ObjectIdentifier, hashOid asn1.ObjectIdentifier) (x509.SignatureAlgorithm, error) {
+	if encryptionOid.Equal(oidEncryptionAlgorithmRSA) {
+		switch {
+		case hashOid.Equal(oidDigestAlgorithmSHA1):
+			return x509.SHA1WithRSA, nil
+		case hashOid.Equal(oidDigestAlgorithmSHA256):
+			return x509.SHA256WithRSA, nil
+		}
+	}
+	return x509.SignatureAlgorithm(0), ErrUnsupportedAlgorithm
 }
 
 // GetOnlySigner returns an x509.Certificate for the first signer of the signed
