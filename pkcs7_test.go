@@ -7,8 +7,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"testing"
 	"time"
@@ -71,42 +71,25 @@ import (
 //	fmt.Printf("=== BEGIN DEGENERATE CERT ===\n% X\n=== END DEGENERATE CERT ===\n", deg)
 //}
 
-//func TestSign(t *testing.T) {
-//	cert, err := createTestCertificate()
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	content := []byte("Hello World")
-//	toBeSigned, err := NewSignedData(content)
-//	if err != nil {
-//		t.Fatalf("Cannot initialize signed data: %s", err)
-//	}
-//	if err := toBeSigned.AddSigner(cert.Certificate, cert.PrivateKey, SignerInfoConfig{}); err != nil {
-//		t.Fatalf("Cannot add signer: %s", err)
-//	}
-//	signed, err := toBeSigned.Finish()
-//	if err != nil {
-//		t.Fatalf("Cannot finish signing data: %s", err)
-//	}
-//	fmt.Printf("=== BEGIN SIGNED RESULT ===\n% X\n=== END SIGNED RESULT ===\n", signed)
-
-//	p7, err := Parse(signed)
-//	if err != nil {
-//		t.Fatalf("Cannot parse our signed data: %s", err)
-//	}
-//	if bytes.Compare(content, p7.Content) != 0 {
-//		t.Errorf("Our content was not in the parsed data:\n\tExpected: %s\n\tActual: %s", content, p7.Content)
-//	}
-//	if err := p7.Verify(); err != nil {
-//		t.Errorf("Cannot verify our signed data: %s", err)
-//	}
-//}
-
-func TestParse(t *testing.T) {
-	signed, err := ioutil.ReadFile("./temp/signature_valid")
+func TestSign(t *testing.T) {
+	cert, err := createTestCertificate()
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err)
 	}
+	content := []byte("Hello World")
+	toBeSigned, err := NewSignedData(content, FLAG_DETACHED)
+	if err != nil {
+		t.Fatalf("Cannot initialize signed data: %s", err)
+	}
+	if err := toBeSigned.AddSigner(cert.Certificate, cert.PrivateKey, SignerInfoConfig{}); err != nil {
+		t.Fatalf("Cannot add signer: %s", err)
+	}
+	signed, err := toBeSigned.Finish()
+	if err != nil {
+		t.Fatalf("Cannot finish signing data: %s", err)
+	}
+	fmt.Printf("=== BEGIN SIGNED RESULT ===\n% X\n=== END SIGNED RESULT ===\n", signed)
+
 	p7, err := Parse(signed)
 	if err != nil {
 		t.Fatalf("Cannot parse our signed data: %s", err)
@@ -114,11 +97,28 @@ func TestParse(t *testing.T) {
 	//	if bytes.Compare(content, p7.Content) != 0 {
 	//		t.Errorf("Our content was not in the parsed data:\n\tExpected: %s\n\tActual: %s", content, p7.Content)
 	//	}
-	if err := p7.Verify(); err != nil {
+	if err := p7.Verify(FLAG_DETACHED); err != nil {
 		t.Errorf("Cannot verify our signed data: %s", err)
 	}
-
 }
+
+//func TestParse(t *testing.T) {
+//	signed, err := ioutil.ReadFile("./temp/signature_valid")
+//	if err != nil {
+//		t.Error(err.Error())
+//	}
+//	p7, err := Parse(signed)
+//	if err != nil {
+//		t.Fatalf("Cannot parse our signed data: %s", err)
+//	}
+//	//	if bytes.Compare(content, p7.Content) != 0 {
+//	//		t.Errorf("Our content was not in the parsed data:\n\tExpected: %s\n\tActual: %s", content, p7.Content)
+//	//	}
+//	if err := p7.Verify(); err != nil {
+//		t.Errorf("Cannot verify our signed data: %s", err)
+//	}
+
+//}
 
 //func TestEncrypt(t *testing.T) {
 //	plaintext := []byte("Hello Secret World!")
